@@ -1,45 +1,50 @@
 /*CHECKLIST
  Check sensors are plugged in correctly - motors red/black facing the right way
  Check back top hats are tightened in
- Check claw is tightened
+ Check claw is tightened and a tiny bit raised
  Check coins and battery are secure
- Make sure red pawns are in the middle of the line
- Make sure camera can see
+ Make sure red pawns are in the middle of the line and out far enough
+ Camera can see correctly (pushed down)
  Top metal stick screwed in tight
+ Check legos are secure
 */
 
 #include <kipr/botball.h>
 #include <stdbool.h>
+
+//motor and sensor ports
 const int Rmotor = 1;
 const int Lmotor = 0;
 const int power = 1470;
 const int powerL = 1500; //power for left motor
-const int range = 0;
-const int topHatF = 2; //front sensor
+const int topHatF = 2; //right front sensor
 const int topHatF2 = 5;
 const int topHatR = 1; //right
 const int topHatL = 0; //left
-const int black = 2000;
-const int white = 400; 
-const int line = 2000;
-const double tickdegl = 15;
-const double tickdegr = 15.5;
-const int burning = 1;
 const int people = 0;
 const int green = 0;
 const int topClaw = 0;
 const int botClaw = 2;
-const int topOpen = 0;
-const int botOpen = 400;
-const int topClose = 992;
-const int botClose = 1400;
 const int frontB = 9;
-bool burn = false;
 const int ambulance = 3;
-const int ambuDown = 1800;
-const int ambuUp = 1468;
 
-void left (int degree, int speed) {
+//constants
+const int line = 2000;
+const int grayline = 1000;
+const double tickdegl = 15;
+const double tickdegr = 15.5;
+
+//claws
+const int topOpen = 10;
+const int botOpen = 360;
+const int topClose = 992;
+const int botClose = 1300;
+const int ambuDown = 1800;
+const int ambuUp = 1300;
+
+//////////////////////// FUNCTIONS
+//turning------------------------
+void left (int degree, int speed) { //left with both wheels
     double ticks = degree * tickdegl;
     int d = gmpc(Rmotor);
     mav(Lmotor, -speed);
@@ -49,7 +54,7 @@ void left (int degree, int speed) {
     }
     ao();
 }
-void leftone (int degree, int speed) {
+void leftone (int degree, int speed) { //move left wheel back
     double ticks = degree * tickdegl * 2;
     int d = gmpc(Lmotor);
     mav(Lmotor, -speed);
@@ -58,7 +63,16 @@ void leftone (int degree, int speed) {
     }
     ao();
 }
-void right (int degree, int speed) {
+void leftone2 (int degree, int speed) { //move left wheel forward
+    double ticks = degree * tickdegl * 2;
+    int d = gmpc(Lmotor);
+    mav(Lmotor, speed);
+    while (gmpc(Lmotor)-d < ticks) {
+        msleep(10);
+    }
+    ao();
+}
+void right (int degree, int speed) { //right with both wheels
     double ticks = degree * tickdegr;
     int d = gmpc(Lmotor);
     mav(Lmotor, speed);
@@ -68,7 +82,7 @@ void right (int degree, int speed) {
     }
     ao();
 }
-void rightone (int degree, int speed) {
+void rightone (int degree, int speed) { //move right wheel back
     double ticks = degree * tickdegr * 2;
     int d = gmpc(Rmotor);
     mav(Rmotor, -speed);
@@ -77,42 +91,30 @@ void rightone (int degree, int speed) {
     }
     ao();
 }
-void forward(){
-    mav(Lmotor, powerL);
-    mav(Rmotor, power);
-    msleep(1000);
+void rightone2 (int degree, int speed) { //move right wheel forward
+    double ticks = degree * tickdegr * 2;
+    int d = gmpc(Rmotor);
+    mav(Rmotor, speed);
+    while (gmpc(Rmotor)-d < ticks) {
+        msleep(10);
+    }
+    ao();
 }
-void passWhite(){
+
+//moving------------------------
+void passWhite(){ //go to black
     while (analog(topHatL) < line || analog(topHatR) < line){
         mav(Rmotor, power);
         mav(Lmotor, powerL);
         msleep(5);
     }
 }
-
-void passBlack(){
+void passBlack(){ //go to white
     while (analog(topHatL) > line || analog(topHatR) > line){
         mav(Rmotor, power);
         mav(Lmotor, powerL);
         msleep(5);
     }
-}
-
-void back(int inches, int speed) {
-    int ticks = inches * 23;
-    int d = gmpc(1);
-    int diff = gmpc(1)-gmpc(0);
-    while(gmpc(1)-d < ticks){
-        if(gmpc(0)+diff < gmpc(1)){
-            mav(0,speed);
-            mav(1,speed-100);           
-        } else{
-            mav(0,speed-100);
-            mav(1,speed);
-        }  
-    }    
-    msleep(10);
-    ao();
 }
 void timeFollow(double z){
 double t = seconds() + z;
@@ -130,12 +132,15 @@ double t = seconds() + z;
     }
 }
 
-void getPawn(int xpos){
-    //line follow for one second to pass the orange
+//this thing------------------------
+int getPawn(int xpos){
     int x;
-    camera_update();
+	
+	//error check
+    timeFollow(2);
+	
     //Line follow until sees green
-    
+    camera_update();
    	while(get_object_count(green) == 0) { 
         if(analog(topHatF) > line){
             mav(Lmotor, 1300);
@@ -148,13 +153,12 @@ void getPawn(int xpos){
             msleep(1);
         }
         camera_update();
+        if(analog(topHatF2) > black) return 0; //check for screw up
     }
-    
-    printf("Area of red: %d \n", get_object_area(people,0));  
+  
+    //Aligns (centers) robot to red pawn
     x = get_object_center_x(people, 0);
     camera_update();
-
-    //Aligns (centers) robot to red pawn
     while (x <= xpos || x > xpos + 20) {
          if(analog(topHatF) > line){
             mav(Lmotor, 1300);
@@ -168,48 +172,47 @@ void getPawn(int xpos){
         }
         x = get_object_center_x(people, 0);
         camera_update();
+        if(analog(topHatF2) > black) return 0;
     }
 	ao();
-    msleep(10);
-    
-    //Moves towards the red pawn then goes back to line
-    ao();
     msleep(100);
+    
+    if(analog(topHatF2) > black) return 0; //check again
+	
+    //turns to set up and opens claws
     rightone(90, power);
     msleep(500);
 
-    //open claws on top and bottom
     set_servo_position(topClaw, topOpen);
     msleep(400);
     set_servo_position(botClaw, botOpen);
     msleep(400);
 
     //Align to gray line
-    while(analog(topHatR) < 2000) {
+    while(analog(topHatR) < grayline) {
         mav(Lmotor, 0);
         mav(Rmotor, 300);
         msleep(1);
     }
     mav(Rmotor, -200);
     msleep(350);
-    while (analog(topHatL) < 2000) {
+    while (analog(topHatL) < grayline) {
         mav(Lmotor, 300);
         mav(Rmotor, 0);
         msleep(1);
     }
     
-    //move forward
+    //move forward and check button
     double t = seconds() + 2.5;
     while(seconds() < t){
         if(digital(frontB)) {
     		mav(Lmotor, -powerL);
     		mav(Rmotor, -power);
     		msleep(500);
-            //left(1,power);
             mav(Lmotor, -500);
     		mav(Rmotor, 0);
     		msleep(200);
-            t += 0.9;
+            t += 1.1;
         } else {
     		mav(Lmotor, powerL);
     		mav(Rmotor, power);
@@ -218,15 +221,13 @@ void getPawn(int xpos){
     }
     ao();
     msleep(10);
-    //close claws
+    
+	//close claws and back up
     set_servo_position(topClaw, topClose);
     msleep(500);
     set_servo_position(botClaw, botClose);
     msleep(500);
-    //set_servo_position(botClaw, 500);
-    //msleep(400);
-    //set_servo_position(botClaw, botClose);
-    //msleep(400);
+	
     while (analog(topHatL) < line || analog(topHatR) < line) {
         mav(Lmotor, -power);
         mav(Rmotor, -power);
@@ -242,28 +243,41 @@ void getPawn(int xpos){
     }
     ao();
     msleep(10);
+	
+    return 0;
 }
 
 int main(){
-    //setup
+    //setup and check
     enable_servos();
     set_servo_position(topClaw, topClose); 
-    set_servo_position(botClaw, botClose);
-    set_servo_position(ambulance,ambuDown);
-    
-    //
-    
+    msleep(500);
+	set_servo_position(botClaw, botClose);
+	msleep(500);
+	//set_servo_position(ambulance,ambuDown);
+    //msleep(500);
+    mav(Lmotor, 1000);
+    mav(Rmotor, 1000);
+    msleep(1000);
+	ao();
+	msleep(1000);
+    mav(Lmotor, 1000);
+    mav(Rmotor, 1000);
+    msleep(-500);
+	
     //START
     wait_for_light(3);
     shut_down_in(119);
+    msleep(500); //wait for other bot
 	
-    set_servo_position(ambulance,ambuUp);
-    msleep(500);
+    //set_servo_position(ambulance,ambuUp);
+    //msleep(500);
+	
     //move forward to avoid collision with wall
     mav(Lmotor, powerL);
     mav(Rmotor, power);
-    msleep(500);
-    //turn right and move foward a bit
+    msleep(1000);
+    //turn right and move forward then turn back to go to center
     right(90, power);
     passWhite();
     passBlack();
@@ -285,43 +299,41 @@ int main(){
     ao();
     msleep(1000);
     while (analog(topHatL) < line) {
-        mav(Lmotor, -100);
-        mav(Rmotor, -100);
+        mav(Lmotor, -200);
+        mav(Rmotor, -200);
         msleep(1);
     }
     while (analog(topHatR) < line) {
         mav(Lmotor, 0);
-        mav(Rmotor, -100);
+        mav(Rmotor, -200);
         msleep(1);
     }
+	
     //turn left onto line
     while (analog(topHatF) < line) {
         mav(Lmotor, -500);
         mav(Rmotor, 0);
         msleep(1);
-        printf("%d\n", analog(topHatF));
     }
-    
+    ao();
+	msleep(10);
+	
     //Opens camera
     camera_open_black();
     msleep(50);
 	
     //Gets pawn thrice
-    timeFollow(3);
-    
-    getPawn(80);
+    getPawn(75);
     camera_close();
     msleep(100);
     camera_open_black();
-    msleep(2000);
-    timeFollow(2);
-    getPawn(80);
+    msleep(1000);
+    getPawn(75);
     camera_close();
     msleep(100);
     camera_open_black();
-    msleep(2000);
-    timeFollow(2);
-    getPawn(85);
+    msleep(1000);
+    getPawn(75);
     
     //line follow to left double black box
     while (analog(topHatF2) < line) {
@@ -353,77 +365,123 @@ int main(){
     	msleep(1);
     	printf("is it burning?: %d\n", get_object_count(people));
 	}
-    if (get_object_count(people) > 0) {  
-        right(150, power);
-        set_servo_position(botClaw, 10); 
+    
+    //put pawns in zone
+    if (get_object_count(people) > 0) {  //is burning
+		//turn back to start and back up a bit
+        right(85, power);
         msleep(500);
-        //right(50, power);
-        //left(10, power);
-        mav(Lmotor, power);
-        mav(Rmotor, power);
-        msleep(2000);
-        //right(10, power);
-        left(10, power);
-       	mav(Rmotor, -power);
-        mav(Lmotor, -power);
-        msleep(3000);
-        set_servo_position(botClaw, botClose);
-        mav(Rmotor, power);
-        mav(Lmotor, power);
-        msleep(3000);
+        mav(Lmotor, -powerL);
         mav(Rmotor, -power);
-        mav(Lmotor, -power);
-        msleep(-1000);
-        left(20, power);
-    	set_servo_position(ambulance,ambuDown);
-   	 	msleep(500);
-        /*
-        mav(Rmotor, -power);
-        mav(Lmotor, -power);
-        msleep(2000);
-        
-        set_servo_position(botClaw, 513);
-        left(20, power);
-        
-        
-        while(!digital(frontB)){
-         mav(Rmotor, power);
-         mav(Lmotor, power);
-         msleep(1);
-        }
-        */
+        msleep(500);
         ao();
-    } else {
-        right(55, power);
-        set_servo_position(botClaw, 10); 
-        msleep(500);
-        while (analog(topHatF2) < line) {
-            mav(Lmotor, power);
-            mav(Rmotor, power);
-            msleep(1);
+        msleep(10);
+		
+		//turn right, back up to line
+        leftone2(75, power);
+        while(analog(topHatL) < line){
+        	mav(Lmotor, -800);
+        	mav(Rmotor, -800);
+        	msleep(10);
+        }
+        while(analog(topHatR) < line){
+        	mav(Lmotor, 0);
+        	mav(Rmotor, -300);
+        	msleep(10);
+        }
+		
+		//turn left to line and do mini checks
+        //mav(Lmotor, powerL);
+        //mav(Rmotor, power);
+        //msleep(100);
+        ao();
+        msleep(10);
+        while(analog(topHatF2) < line){
+        	mav(Rmotor,500);
+            msleep(10);
     	}
-        while (analog(topHatF2) > line) {
-            mav(Lmotor, power);
-            mav(Rmotor, power);
-            msleep(1);
+        while(analog(topHatF2) > line){
+        	mav(Rmotor,-500);
+            msleep(10);
     	}
-        mav(Lmotor, power);
-        mav(Rmotor, power);
-        msleep(500);
-        
-     	set_servo_position(botClaw, botClose);   
-        left(20, power);
-        mav(Lmotor, -power);
+        ao();
+        msleep(10);
+        while(analog(topHatF) < line){
+        	mav(Lmotor,300);
+            msleep(10);
+    	}
+        ao();
+        msleep(10);
+		
+		//back up to give room to open claw
+        mav(Lmotor, -powerL);
         mav(Rmotor, -power);
         msleep(500);
-        set_servo_position(botClaw, botOpen);
-		right(15, power);
-        mav(Lmotor, power);
+        set_servo_position(botClaw, 666);
+        msleep(500);
+		
+		//go in and make a turn to shake people out
+        while (analog(topHatF2) < line){
+            mav(Rmotor, power);
+            mav(Lmotor, powerL);
+            msleep(5);
+    	}
+        while (analog(topHatF2) > line){
+            mav(Rmotor, power);
+            mav(Lmotor, powerL);
+            msleep(5);
+        }
+        ao();
+        msleep(10);
+        leftone(10, power);
+        leftone2(20, power); 
+        ao();
+    } 
+    ////////////not burning
+    else { 
+		//forward a bit and turn right to line and do mini checks
+        mav(Lmotor, powerL);
         mav(Rmotor, power);
         msleep(500);
-        rightone(10, power);
-    	set_servo_position(ambulance,ambuDown);
-   	 	msleep(500);
-    }
+        ao();
+        msleep(10);
+        while(analog(topHatF) < line){
+        	mav(Lmotor, 800);
+        	mav(Rmotor, 0);
+        	msleep(10);
+        }
+        ao();
+        msleep(10);
+        while(analog(topHatF2) > line){
+        	mav(Rmotor, -300);
+            msleep(10);
+    	}
+        ao();
+        msleep(10);
+		
+		//back up to allow room for claw to open
+        mav(Lmotor, -powerL);
+        mav(Rmotor, -power);
+        msleep(500);
+        set_servo_position(botClaw, 666);
+        msleep(500);
+		
+		//go in and make a turn to shake people out
+        while (analog(topHatF2) < line){
+            mav(Rmotor, power);
+            mav(Lmotor, powerL);
+            msleep(5);
+    	}
+        while (analog(topHatF2) > line){
+            mav(Rmotor, power);
+            mav(Lmotor, powerL);
+            msleep(5);
+        }
+        ao();
+        msleep(10);
+        leftone(10, power);
+        leftone2(20, power); 
+        ao();
+    	}
     return 0;
 }
