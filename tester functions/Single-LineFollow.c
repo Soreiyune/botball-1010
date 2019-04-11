@@ -24,5 +24,5 @@ while(t > seconds()){
 }
 
 int main(){
-sinLine(4);
+	sinLine(4);
 }
